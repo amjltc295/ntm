@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"log"
@@ -15,6 +16,20 @@ var (
 	weightsFile = flag.String("weightsFile", "", "trained weights in JSON")
 )
 
+func readLines(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
+}
+
 func main() {
 	flag.Parse()
 	gen, err := poem.NewGenerator("data/quantangshi3000.int")
@@ -28,12 +43,42 @@ func main() {
 	c := ntm.NewEmptyController1(gen.InputSize(), gen.OutputSize(), h1Size, numHeads, n, m)
 	assignWeights(c)
 
+	fout, err := os.Create("out_target.txt")
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	defer fout.Close()
+
+	content, err := readLines("/tmp2/yaliangchang/sdml-final-project-tang-poetry-generation/processed_dataset/head_target.txt")
+	log.Printf("File contents: %s", content)
 	p := [][]string{
 		{"红", "", "", "", ""},
 		{"春", "", "", "", ""},
 		{"愿", "", "", "", ""},
 		{"此", "", "", "", ""},
 	}
+
+	for i, line := range content {
+		j := 0
+		for _, char := range line {
+			p[j][0] = string(char)
+			j++
+		}
+		rand.Seed(int64(i))
+		pred := predict(c, p, gen)
+		result := showPrediction(pred, gen, p)
+		_, err := fout.WriteString(result)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+	}
+
+	//p2 := [][]string{
+	//	{"红", "", "", "", ""},
+	//	{"春", "", "", "", ""},
+	//	{"愿", "", "", "", ""},
+	//	{"此", "", "", "", ""},
+	//}
 	//p := [][]string{
 	//  {"阿", "", "", "", ""},
 	//  {"扁", "", "", "", ""},
@@ -66,12 +111,9 @@ func main() {
 	//	{"文", "", "", "", "", "", ""},
 	//	{"哲", "", "", "", "", "", ""},
 	//}
-	rand.Seed(15)
-	pred := predict(c, p, gen)
-	showPrediction(pred, gen, p)
 }
 
-func showPrediction(pred [][]float64, gen *poem.Generator, oripoem [][]string) {
+func showPrediction(pred [][]float64, gen *poem.Generator, oripoem [][]string) string {
 	ps := make([]string, len(pred))
 
 	// Prepare a slice representation of the poem constraints.
@@ -103,7 +145,7 @@ func showPrediction(pred [][]float64, gen *poem.Generator, oripoem [][]string) {
 				if c.S == poem.CharUnknown || c.S == poem.CharLinefeed {
 					continue
 				}
-				var dup bool = false
+				var dup = false
 				for _, psc := range ps {
 					if psc == c.S {
 						dup = true
@@ -129,7 +171,7 @@ func showPrediction(pred [][]float64, gen *poem.Generator, oripoem [][]string) {
 	}
 
 	// Print the final generated poem.
-	s := "\n"
+	s := ""
 	for _, c := range ps[len(ps)/2+1:] {
 		if c == poem.CharLinefeed {
 			s += "\n"
@@ -138,6 +180,7 @@ func showPrediction(pred [][]float64, gen *poem.Generator, oripoem [][]string) {
 		}
 	}
 	log.Printf(s)
+	return s
 }
 
 func predict(c ntm.Controller, shi [][]string, gen *poem.Generator) [][]float64 {
@@ -148,11 +191,11 @@ func predict(c ntm.Controller, shi [][]string, gen *poem.Generator) [][]float64 
 	output := make([][]float64, 0)
 	for _, line := range shi {
 		for _, s := range line {
-			numChar += 1
+			numChar++
 			input := vecFromString(s, gen)
 			machine, output = forward(machine, input, output)
 		}
-		numChar += 1
+		numChar++
 		input := gen.Linefeed()
 		machine, output = forward(machine, input, output)
 	}
