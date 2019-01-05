@@ -49,27 +49,28 @@ func main() {
 	}
 	defer fout.Close()
 
-	content, err := readLines("/tmp2/yaliangchang/sdml-final-project-tang-poetry-generation/processed_dataset/head_target.txt")
-	log.Printf("File contents: %s", content)
+	content, err := readLines("/tmp2/yaliangchang/sdml-final-project-tang-poetry-generation/processed_dataset/head_4_8_source.txt")
+	log.Printf("File contents[:10]: %s", content[:10])
 	p := [][]string{
-		{"红", "", "", "", ""},
-		{"春", "", "", "", ""},
-		{"愿", "", "", "", ""},
-		{"此", "", "", "", ""},
+		{"G", "", "", "", ""},
+		{"G", "", "", "", ""},
+		{"G", "", "", "", ""},
+		{"G", "", "", "", ""},
 	}
 
 	for i, line := range content {
-		j := 0
-		for _, char := range line {
-			p[j][0] = string(char)
-			j++
-		}
-		rand.Seed(int64(i))
-		pred := predict(c, p, gen)
-		result := showPrediction(pred, gen, p)
-		_, err := fout.WriteString(result)
-		if err != nil {
-			log.Fatalf("%v", err)
+		for k := 0; k < len([]rune(line))/4; k++ {
+			//_ = "breakpoint"
+			for j := k * 4; j < k*4+4; j++ {
+				p[j%4][0] = string([]rune(line)[j])
+			}
+			rand.Seed(int64(i))
+			pred := predict(c, p, gen)
+			result := showPrediction(pred, gen, p)
+			_, err := fout.WriteString(result)
+			if err != nil {
+				log.Fatalf("%v", err)
+			}
 		}
 	}
 
