@@ -6,7 +6,9 @@ import (
 	"flag"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
+	"strings"
 
 	"github.com/fumin/ntm"
 	"github.com/fumin/ntm/poem"
@@ -14,6 +16,7 @@ import (
 
 var (
 	weightsFile = flag.String("weightsFile", "", "trained weights in JSON")
+	c, gen      = setup()
 )
 
 func readLines(path string) ([]string, error) {
@@ -30,7 +33,52 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
+func sayHello(w http.ResponseWriter, r *http.Request) {
+	message := r.URL.Path
+	message = strings.TrimPrefix(message, "/")
+	message = "Hello " + message
+	w.Write([]byte(message))
+	log.Printf(message)
+}
+
+func doInfer(w http.ResponseWriter, r *http.Request) {
+	heads := r.URL.Path
+	heads = strings.TrimPrefix(heads, "/infer/")
+	log.Printf("Heads: %s", heads)
+	//for k := 0; k < len([]rune(line))/4; k++ {
+	//	//_ = "breakpoint"
+	//	for j := k * 4; j < k*4+4; j++ {
+	//		p[j%4][0] = string([]rune(line)[j])
+	//	}
+	rand.Seed(15)
+	_ = "breakpoint"
+	length := len([]rune(heads))
+	p := make([][]string, length)
+	log.Printf("p: %s", p)
+	for i := range p {
+		p[i] = make([]string, 5)
+	}
+	for i := 0; i < len([]rune(heads)); i++ {
+		p[i][0] = string([]rune(heads)[i])
+		for j := 1; j < 5; j++ {
+			p[i][j] = ""
+		}
+	}
+	pred := predict(c, p, gen)
+	result := showPrediction(pred, gen, p)
+	w.Write([]byte(result))
+}
+
 func main() {
+	http.HandleFunc("/", sayHello)
+	http.HandleFunc("/infer/", doInfer)
+	log.Printf("Starting server on localhost:8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		panic(err)
+	}
+}
+
+func setup() (ntm.Controller, *poem.Generator) {
 	flag.Parse()
 	gen, err := poem.NewGenerator("data/quantangshi3000.int")
 	if err != nil {
@@ -42,76 +90,7 @@ func main() {
 	m := 32
 	c := ntm.NewEmptyController1(gen.InputSize(), gen.OutputSize(), h1Size, numHeads, n, m)
 	assignWeights(c)
-
-	fout, err := os.Create("out_target.txt")
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
-	defer fout.Close()
-
-	content, err := readLines("/tmp2/yaliangchang/sdml-final-project-tang-poetry-generation/processed_dataset/head_4_8_source.txt")
-	log.Printf("File contents[:10]: %s", content[:10])
-	p := [][]string{
-		{"G", "", "", "", ""},
-		{"G", "", "", "", ""},
-		{"G", "", "", "", ""},
-		{"G", "", "", "", ""},
-	}
-
-	for i, line := range content {
-		for k := 0; k < len([]rune(line))/4; k++ {
-			//_ = "breakpoint"
-			for j := k * 4; j < k*4+4; j++ {
-				p[j%4][0] = string([]rune(line)[j])
-			}
-			rand.Seed(int64(i))
-			pred := predict(c, p, gen)
-			result := showPrediction(pred, gen, p)
-			_, err := fout.WriteString(result)
-			if err != nil {
-				log.Fatalf("%v", err)
-			}
-		}
-	}
-
-	//p2 := [][]string{
-	//	{"红", "", "", "", ""},
-	//	{"春", "", "", "", ""},
-	//	{"愿", "", "", "", ""},
-	//	{"此", "", "", "", ""},
-	//}
-	//p := [][]string{
-	//  {"阿", "", "", "", ""},
-	//  {"扁", "", "", "", ""},
-	//  {"无", "", "", "", ""},
-	//  {"罪", "", "", "", ""},
-	//}
-	//p := [][]string{
-	//  {"九", "", "", "", "", "", ""},
-	//  {"二", "", "", "", "", "", ""},
-	//  {"共", "", "", "", "", "", ""},
-	//  {"识", "", "", "", "", "", ""},
-	//}
-	//p := [][]string{
-	//  {"十", "", "", "", ""},
-	//  {"四", "", "", "", ""},
-	//  {"日", "", "", "", ""},
-	//  {"罢", "", "", "", ""},
-	//  {"免", "", "", "", ""},
-	//  {"蔡", "", "", "", ""},
-	//  {"正", "", "", "", ""},
-	//  {"元", "", "", "", ""},
-	//}
-	//p := [][]string{
-	//	{"全", "", "", "", "", "", ""},
-	//	{"力", "", "", "", "", "", ""},
-	//	{"支", "", "", "", "", "", ""},
-	//	{"持", "", "", "", "", "", ""},
-	//	{"柯", "", "", "", "", "", ""},
-	//	{"匹", "", "", "", "", "", ""},
-	//	{"文", "", "", "", "", "", ""},
-	//	{"哲", "", "", "", "", "", ""},
-	//}
+	return c, gen
 }
 
 func showPrediction(pred [][]float64, gen *poem.Generator, oripoem [][]string) string {
