@@ -1,3 +1,14 @@
+# API Server for NTM Poetry Generation
+
+An API server for [NTM](https://github.com/fumin/ntm)
+
+After installation, run
+```
+cd main
+go run test/main.go -weightsFile=test/h1Size512_numHeads8_n128_m32/seed9_78100_5p6573
+```
+
+# The following documents are from the orignal repo
 Neural Turing Machines
 -----
 Package ntm implements the Neural Turing Machine architecture as described in A.Graves, G. Wayne, and I. Danihelka. arXiv preprint arXiv:1410.5401, 2014.
